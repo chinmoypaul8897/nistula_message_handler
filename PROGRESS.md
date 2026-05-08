@@ -15,7 +15,7 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 | C6    | Done           | 2026-05-08 16:58 UTC  | schema.sql -- 8 tables + 5 enums + indexes, 158-word HDD|
 | C7    | Done           | 2026-05-08 17:18 UTC  | thinking.md -- 399/400 words, all required content present|
 | C8    | Done           | 2026-05-08 17:33 UTC  | README.md -- 3613 words mid-band, 11/11 sections present|
-| C9    | Not started    | -                     | -                                                      |
+| C9    | Done           | 2026-05-08 17:53 UTC  | Clean-clone verified, live test green, S16 checklist passed|
 
 ## Chunk-by-chunk log
 
@@ -257,3 +257,86 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 - **Setup smoke test re-run in place:** uvicorn boots clean, `curl /healthz` returns `{"status":"ok"}` HTTP 200, **live `curl POST /webhook/message`** with the brief's example payload returns HTTP 200 in 5.87s with `action=auto_send`, `confidence_score=0.965`, 256-char reply quoting INR 18,000 and addressing Rahul by name.
 - `.env` confirmed gitignored before the live call; no key strings in staged diff.
 **Commit:** `docs: complete README with architecture, decisions, and confidence scoring walkthrough`
+
+### C9 - Final Polish, Clean-Clone Test, Submission
+**Completed:** 2026-05-08 17:53 UTC
+**Files modified:** PROGRESS.md (this entry)
+**What was built:** Final submission gate. No code or doc changes after the C9 sweep -- this chunk is verification, not creation. Working tree confirmed clean (no stray __pycache__ outside .gitignore, no leftover live-test capture files); README read-through automated for typos / broken links / unbalanced code fences (all clean); no-key-in-history scan confirmed three commits touch `sk-ant-` but only as the literal `sk-ant-...` documentation placeholder, zero real keys; all five PLAN S9 canonical cases confirmed passing with their expected actions; full clean-clone test executed against the public repo HEAD; one final live API run captured for the audit trail; PLAN S16 pre-submission checklist walked end-to-end with every item green; submission email drafted below for the user to send.
+
+**Decisions made or changed:**
+- **Clean-clone test on Windows uses `C:\Users\chinm\nistula_clone_test`**, not POSIX `/tmp/test`. Behaviorally equivalent; documents the path swap so the reviewer following PLAN S15 C9 step 1 literally on a POSIX machine doesn't get confused.
+- **The clone test uvicorn binds to port 8001**, not 8000, to avoid colliding with anything still bound on the default port from the C8 in-place test. README documents 8000; the port is configurable via the `--port` flag and the test confirms the app works on both.
+- **`.env` for the clone was copied from the source repo** rather than re-typed. The repo already trusts that key locally; copying avoids any chance of fat-fingering. Documented because PLAN S15 C9 step 1 says `cp .env.example .env # add key` -- the exact provisioning step is the user's at submission time.
+- **Submission email is drafted in this PROGRESS.md C9 entry**, not as a separate file. Single audit trail; the email body is here verbatim for the user to copy into their mail client. Email is NOT auto-sent (no SMTP tool available; not in scope of this build).
+
+**Deviations from plan:** None.
+
+**Issues encountered:**
+- During the clean-clone curl, the bash subprocess reported `HTTP=$?` => 0 (the curl exit code, not the HTTP status), which is misleading at first glance. The actual HTTP status was visible in the response body (clean JSON parse, all expected fields populated, `confidence_score=0.965`, `action=auto_send`). No issue with the application -- only with how the smoke-test echo line was structured. Documented for future runs: capture the HTTP status from `curl -w "%{http_code}"` and write it on a separate line so it doesn't get muddied with `$?`.
+
+**Section 16 pre-submission checklist (all green):**
+
+| # | Item | Verification | Result |
+|---|------|--------------|--------|
+| 1 | Repo public at `https://github.com/chinmoypaul8897/nistula_message_handler` | `git remote -v` + manual GitHub visit | OK |
+| 2 | `README.md` complete and tested on clean clone | Clone test below | OK |
+| 3 | `PLAN.md` in repo | `ls PLAN.md` -> 63316 bytes | OK |
+| 4 | `PROGRESS.md` complete | This file, 9 chunk entries | OK |
+| 5 | `src/` complete (main, models, claude_client, confidence, prompts, property_context) | `ls src/*.py` | 6 files |
+| 6 | `tests/` complete (>=3 integration tests passing on mocked Claude; live verified once) | `pytest tests/` -> 38 passed, 1 skipped; `RUN_LIVE_TESTS=1 pytest -m live` -> 1 passed | OK |
+| 7 | `schema.sql` with hardest-design-decision paragraph | 158-word HDD block at top of file | OK |
+| 8 | `thinking.md` <= 400 words | `wc -w thinking.md` -> 399 | OK |
+| 9 | `.env.example` present, no key value | `grep ANTHROPIC_API_KEY= .env.example` -> empty value | OK |
+| 10 | `.gitignore` excludes `.env` | `git check-ignore .env` returns `.env` | OK |
+| 11 | No API key anywhere in git history | `git log --all -p \| grep -iE "sk-ant-[A-Za-z0-9_-]{15,}"` -> zero hits | OK |
+| 12 | All five canonical test cases produce expected `action` | `pytest tests/test_endpoint.py -k case -v` -> 5 passed | OK |
+| 13 | Email drafted to `Contact.us@nistula.life` | Below | OK |
+
+**Verification (executed locally):**
+
+- **Working-tree sweep:** `git status` -> nothing to commit; `ls -la` -> only the expected files (CLAUDE.md, PLAN.md, PROGRESS.md, README.md, requirements.txt, schema.sql, thinking.md, .env, .env.example, .gitignore, src/, tests/, .venv/, .git/, .pytest_cache/); no stray temp files (`c4_live.json` / `c8_live.json` already removed in their respective chunks; the C9 clone-test file `c9_clone_live.json` removed before commit).
+- **README read-through:** automated check via Python -- 0 broken markdown links (every `[text](path)` resolves), 16 code fences (balanced), 0 duplicate-word typos, 0 trailing-whitespace lines.
+- **No-key-in-history scan:** `git log --all -S "sk-ant-" --oneline` -> 3 commits (`f74e0c8` seed, `da3357c` C0, `bef8546` C8) all touching the literal `sk-ant-...` documentation placeholder. `git log --all -p | grep -iE "sk-ant-[A-Za-z0-9_-]{15,}"` -> zero hits (no real-key-shaped strings ever entered history).
+- **Five canonical cases:** `pytest tests/test_endpoint.py -k case -v` -> 5 passed in 2.12s.
+  - case_1_pre_sales_availability_returns_auto_send PASSED
+  - case_2_pre_sales_pricing_with_missing_info_caps_at_07_agent_review PASSED
+  - case_3_complaint_3am_zeroes_score_and_escalates PASSED
+  - case_4_ambiguous_low_content_routes_to_agent_review PASSED
+  - case_5_prompt_injection_does_not_leak_or_grant_discount PASSED
+- **Clean-clone test:** cloned `https://github.com/chinmoypaul8897/nistula_message_handler.git` into `C:\Users\chinm\nistula_clone_test`, fresh `python -m venv .venv` (Python 3.12.2), `pip install -r requirements.txt` (Successfully installed anthropic 0.100.0 fastapi 0.136.1 pydantic 2.13.4 etc. -- identical to the source venv). Copied source `.env` -> clone `.env`. `pytest tests/` -> 38 passed, 1 skipped in 2.00s. `uvicorn src.main:app --port 8001` boots clean. `curl /healthz` -> `{"status":"ok"}` HTTP 200. `curl POST /webhook/message` with PLAN S9 case 1 payload -> HTTP 200 with `action=auto_send`, `confidence_score=0.965`, 242-char reply addressing Rahul and quoting INR 18,000 base + INR 72,000 total. Clone directory removed after success.
+- **Final live re-run** (sanitized; the audit-trail entry PLAN S15 C9 step 2 requires):
+  ```
+  RUN_LIVE_TESTS=1 pytest -m live tests/test_endpoint.py -v
+  -> tests/test_endpoint.py::test_live_case_1_against_real_anthropic_api PASSED
+     1 passed, 5 deselected, 1 warning in 6.73s
+  ```
+  Warning: `claude-sonnet-4-20250514` deprecation -> EOL 2026-06-15 (also flagged in C5 PROGRESS, README §10 future work).
+- **Git history sanity:** `git log --oneline` -> 10 commits in clean conventional-commits chain (chore->feat->feat->feat->feat->feat->test->feat->docs->docs); zero `wip`, zero `fix typo`, zero merge commits. No squashing needed.
+
+**Submission email** (drafted; the user sends from their mail client to `Contact.us@nistula.life`):
+
+```
+To:      Contact.us@nistula.life
+Subject: Nistula Technical Assessment Submission -- Chinmoy Paul
+
+Hi Nistula team,
+
+Submitting the technical assessment.
+
+Repo:    https://github.com/chinmoypaul8897/nistula_message_handler
+
+Contents:
+- Part 1 (webhook + Claude integration + confidence scoring) under src/, with mocked + live tests under tests/.
+- Part 2 (PostgreSQL unified-messaging schema) in schema.sql -- the "hardest design decision" paragraph on identity resolution is at the top of the file.
+- Part 3 (3am hot-water scenario response, 399 words) in thinking.md.
+
+The README at the repo root walks the architecture, the locked decisions, the confidence-scoring math (with two worked examples), and the security considerations. PLAN.md and PROGRESS.md document the engineering process chunk-by-chunk for anyone who wants to see how the project was built.
+
+Thanks for the opportunity. Looking forward to your feedback.
+
+-- Chinmoy
+```
+
+**Final commit:** `docs: finalize README, test on clean clone, complete PROGRESS.md`
+
+**The repository is ready for submission.** All deliverables present, all tests green, all checklist items verified. The user's remaining action is to copy the email above into a mail client and send.
