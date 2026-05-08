@@ -7,7 +7,7 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 | Chunk | Status         | Completed             | Notes                                                  |
 |-------|----------------|-----------------------|--------------------------------------------------------|
 | C0    | Done           | 2026-05-08 14:42 UTC  | Repo seeded, venv verified, FastAPI healthz live       |
-| C1    | Not started    | -                     | -                                                      |
+| C1    | Done           | 2026-05-08 14:53 UTC  | Pydantic models + Villa B1 context, 8/8 tests passing  |
 | C2    | Not started    | -                     | -                                                      |
 | C3    | Not started    | -                     | -                                                      |
 | C4    | Not started    | -                     | -                                                      |
@@ -43,3 +43,23 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 - `curl http://127.0.0.1:8000/openapi.json` -> HTTP 200.
 - `.env` not present in working tree; `.gitignore` excludes it.
 **Commit:** `chore: initialize project skeleton with FastAPI healthz endpoint and gitignore`
+
+### C1 - Pydantic Models & Property Context
+**Completed:** 2026-05-08 14:53 UTC
+**Files created:** src/models.py, src/property_context.py, tests/__init__.py, tests/test_models.py
+**What was built:** The unified schema as code. Two Literal type aliases (`QueryType`, `ActionType`) and a `SourceChannel` alias. Four Pydantic v2 BaseModels: `InboundWebhook` (untrusted boundary), `UnifiedMessage` (internal normalized form, with `from_inbound` classmethod), `ClaudeReplyOutput` (mirrors PLAN S7.2 tool input_schema), `EndpointResponse` (HTTP response shape). Property-context module holds the locked Villa B1 dict and a `format_for_prompt()` helper that renders flat human-readable lines for the system prompt. No business logic, no LLM imports.
+**Decisions made or changed:**
+- `InboundWebhook` uses `extra="ignore"`. Channels send heterogeneous payloads (WhatsApp adds message IDs, Booking.com adds reservation metadata) and forbidding extras would 422 every payload that does not exactly match. The full original payload will be preserved as `messages.raw_payload` JSONB per PLAN S10.3.
+- `ClaudeReplyOutput` and `UnifiedMessage` and `EndpointResponse` use `extra="forbid"`. We own those shapes end-to-end -- surprises mean the SDK changed or our code drifted, and the endpoint layer should surface that as HTTP 502 (PLAN S7.5) rather than swallow it silently.
+- Naive timestamps are rejected at the boundary via a `@field_validator("timestamp")` on `InboundWebhook`. PLAN says "datetime, UTC" but does not specify what to do with naive input. `is_after_hours` (C3) converts to IST -- a naive timestamp would silently drift by 5h30m and flip the after-hours override result. Failing fast at validation is cleaner than silent coercion.
+- `format_for_prompt()` uses flat `Label: value` lines, booleans rendered Yes/No, and the rate card combined into two coherent lines so the LLM sees pricing as a unit rather than three disconnected integers. Wifi password, base rate, and check-in time are explicit so the asserted test for those substrings is mechanical.
+- 8 tests instead of the 6 PLAN S15 C1 lists explicitly. Added: `rejects_naive_timestamp` (guards the IST drift footgun) and `unified_message_uuids_are_unique_across_calls` (catches the classic `default=` vs `default_factory=` mistake). Both are cheap and document real invariants.
+**Deviations from plan:**
+- None on the locked spec. PLAN S8 VILLA_B1 is reproduced byte-for-byte; PLAN S7.2 ClaudeReplyOutput shape matches the tool input_schema 1:1; the six required test cases are all present.
+- PLAN listed `QueryType` and `ActionType` as third and fifth "Pydantic models". They are implemented as `typing.Literal` type aliases (not `BaseModel`s), which is what PLAN's spec literal `Literal[...]` actually is. Pydantic handles `Literal` natively.
+**Issues encountered:** None.
+**Verification (executed locally):**
+- `pytest tests/test_models.py -v` -> 8 passed in 0.24s.
+- `python -c "from src.models import InboundWebhook, UnifiedMessage, ClaudeReplyOutput, EndpointResponse, QueryType, ActionType"` -> imports OK.
+- `python -c "from src.property_context import format_for_prompt; print(format_for_prompt())"` -> 15-line block printed; wifi password `Nistula@2024`, base rate `INR 18000`, and check-in `14:00` all visible.
+**Commit:** `feat: add Pydantic models for unified schema and Villa B1 property context`
