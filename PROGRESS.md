@@ -14,7 +14,7 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 | C5    | Done           | 2026-05-08 16:41 UTC  | 5 canonical scenarios + live test, 38/38 + 1 live green|
 | C6    | Done           | 2026-05-08 16:58 UTC  | schema.sql -- 8 tables + 5 enums + indexes, 158-word HDD|
 | C7    | Done           | 2026-05-08 17:18 UTC  | thinking.md -- 399/400 words, all required content present|
-| C8    | Not started    | -                     | -                                                      |
+| C8    | Done           | 2026-05-08 17:33 UTC  | README.md -- 3613 words mid-band, 11/11 sections present|
 | C9    | Not started    | -                     | -                                                      |
 
 ## Chunk-by-chunk log
@@ -233,3 +233,27 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 **Reply text (the answer to Question A, quoted in full for the audit trail):**
 > James -- I'm so sorry. I've just woken our on-call team for Villa B1; they'll be in touch with you within minutes. We know breakfast is coming and we'll do everything we can. Truly sorry for the disruption.
 **Commit:** `docs: add thinking.md responses for 3am hot water scenario`
+
+### C8 - README (Highest-Leverage Block)
+**Completed:** 2026-05-08 17:33 UTC
+**Files modified:** README.md (full rewrite from C0 skeleton)
+**What was built:** 3613-word README covering all 11 PLAN S12.1 sections in order: 1. Summary; 2. Architecture (PLAN S15 C8 Mermaid `flowchart LR` block verbatim + ~120-word caption pointing at the C4 error paths in prose); 3. Setup (clone, both POSIX and PowerShell venv activation, install, .env, uvicorn, /docs); 4. Usage example (single curl against /webhook/message with PLAN S9 case 1 payload + expected EndpointResponse JSON shape); 5. Architectural decisions (six tight subsections from PLAN S3 with choice / why / what was rejected); 6. Confidence scoring walkthrough (4-factor formula + three hard overrides + threshold table + reply_completeness heuristic + two worked examples: 0.945 -> auto_send pricing case from PLAN S6.7 and 0.0 -> escalate 3am complaint with override #1); 7. Security (prompt injection defense at the system prompt + XML user envelope, API key handling via .env / .env.example / pre-push scan, PII discipline in logs, **explicit reference to test case 5**); 8. Testing (pytest commands + per-file coverage breakdown); 9. What's in the repo and why (file inventory of src/ with one-line description per module + cross-references to PLAN.md / PROGRESS.md / thinking.md / schema.sql); 10. What I'd do with more time (persistence layer wired to schema.sql, retry-with-backoff, observability via X-Message-Id, rate limiting, eval harness, channel-specific message formatting, **Anthropic SDK deprecation watch for 2026-06-15**, broader live coverage); 11. Assumptions (8 listed: IST tz, naive timestamps rejected, override #2 cap at 0.59, single-subtraction hedges, single-property scope, **PLAN S9 case 3 timestamp anomaly disclosed**, sender_kind TEXT, extra=ignore on InboundWebhook, message_id generated server-side, sync handler over async).
+**Decisions made or changed:**
+- **Verbatim Mermaid from PLAN S15 C8.** Faithful to the locked spec; one source of truth for the diagram. The accompanying caption mentions C4 error paths in prose without making the diagram busy.
+- **Mid-band word target (~3500-3800).** Demonstrates depth on every section without bloat. Initial draft hit 3308 words (12 below the lower bound); enriched §6 (binary-quantization rationale for context_sufficiency, strict-inequality rationale for the 0.85 threshold), §9 (per-module file inventory of src/), and §11 (two more genuine assumptions: server-side message_id generation, sync handler) to land at 3613 words -- squarely mid-band.
+- **Two worked examples per PLAN S6.7's explicit suggestion.** Pricing -> 0.945 -> auto_send shows the happy path with full math; 3am complaint -> 0.0 -> escalate shows override #1 firing and explains why the override exists (the would-be base score is around 0.581, plausibly above 0.5 for confident complaint classifications).
+- **Test case 5 cited explicitly under Security** with the four forbidden-token assertions called out by name (90%, system prompt, PROPERTY CONTEXT, Nistula@2024 wifi-password canary) so the reviewer can find the assertion in tests/test_endpoint.py.
+- **PLAN S9 case 3 timestamp anomaly disclosed in Assumptions** rather than glossed over -- a careful reviewer reading the case 3 fixture will see the artifact owned, not hidden.
+- **No CI badges, no contributors section, no license boilerplate.** PLAN treats reviewers as senior engineers skimming for signal; those add zero signal.
+**Deviations from plan:**
+- None on locked spec. All 11 PLAN S12.1 sections present in order, two worked examples present, security mentions test case 5 explicitly, word count mid-band per user choice.
+**Issues encountered:**
+- Initial draft landed at 3308 words, 12 below the 3500 lower bound the user agreed on. Enriched §6 / §9 / §11 with signal-bearing additions (not filler) to reach 3613 words. Each addition was real content -- binary-quantization rationale, src/ inventory, two more genuine assumptions -- not whitespace or padding.
+- Curl `-w` flag during the smoke test wrote the trailing status line into the response capture file alongside the JSON body, breaking the subsequent `json.load`. Pure tooling artifact; the `curl` stdout itself showed HTTP 200 with the correct body. No code or doc change needed.
+**Verification (executed locally):**
+- `wc -w README.md` -> **3613** (target band [3500, 3800] -> in band).
+- Python check: all 11 PLAN S12.1 section headers present (`## 1. Summary` ... `## 11. Assumptions`); Mermaid block + `flowchart LR` present; both worked examples (0.945 string + 3am narrative) present; test case 5 cited; PLAN.md / PROGRESS.md / thinking.md / schema.sql all cross-referenced; no marketing language ("excited to share", "welcome to") and no self-praise ("elegant", "robust", "best-in-class").
+- `pytest tests/` -> 38 passed, 1 skipped in 1.64s (no regression after the doc rewrite).
+- **Setup smoke test re-run in place:** uvicorn boots clean, `curl /healthz` returns `{"status":"ok"}` HTTP 200, **live `curl POST /webhook/message`** with the brief's example payload returns HTTP 200 in 5.87s with `action=auto_send`, `confidence_score=0.965`, 256-char reply quoting INR 18,000 and addressing Rahul by name.
+- `.env` confirmed gitignored before the live call; no key strings in staged diff.
+**Commit:** `docs: complete README with architecture, decisions, and confidence scoring walkthrough`
