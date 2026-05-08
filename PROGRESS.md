@@ -12,7 +12,7 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 | C3    | Done           | 2026-05-08 15:49 UTC  | Confidence scoring + overrides, 33/33 tests passing    |
 | C4    | Done           | 2026-05-08 16:00 UTC  | /webhook/message wired end-to-end, 200/422 verified live|
 | C5    | Done           | 2026-05-08 16:41 UTC  | 5 canonical scenarios + live test, 38/38 + 1 live green|
-| C6    | Not started    | -                     | -                                                      |
+| C6    | Done           | 2026-05-08 16:58 UTC  | schema.sql -- 8 tables + 5 enums + indexes, 158-word HDD|
 | C7    | Not started    | -                     | -                                                      |
 | C8    | Not started    | -                     | -                                                      |
 | C9    | Not started    | -                     | -                                                      |
@@ -181,3 +181,29 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 - `pytest --markers | findstr live` confirms the `live` marker is registered (no PytestUnknownMarkWarning).
 - `.env` confirmed gitignored before the live call; no key strings in staged diff.
 **Commit:** `test: add integration tests for all five canonical scenarios with mocked Claude`
+
+### C6 - Database Schema (Part 2)
+**Completed:** 2026-05-08 16:58 UTC
+**Files created:** schema.sql
+**What was built:** PostgreSQL DDL for the unified messaging platform per PLAN S10. Top-of-file 158-word "Hardest Design Decision" comment block on identity resolution (the brief's required narrative). Re-runnable preamble (DROP TABLE IF EXISTS ... CASCADE, DROP TYPE IF EXISTS) so the reviewer can execute against the same database without manual cleanup. `pgcrypto` extension for `gen_random_uuid()`. Five enum types (`source_channel`, `query_type`, `action_type`, `message_direction`, `send_status`) -- enum values match `src/models.py` Literal types byte-for-byte so a future ORM round-trips without translation. Eight tables in dependency order: `properties`, `agents`, `guests`, `guest_identifiers`, `reservations`, `conversations`, `messages`, `message_audit_log`. Seven indexes (composite on messages, partial on conversations.reservation_id, partial on outbox-pending, partial on active guests, audit-log lookup).
+**Decisions made or changed:**
+- **Hybrid `properties` shape: queryable columns + `details` JSONB.** Rate card, slug, max_guests, check-in/out, cancellation policy as first-class columns (the messaging platform joins/displays these). PLAN S8 long-tail fields (wifi_password, chef_on_call, chef_requires_prebooking, availability snapshots) live in `details JSONB`. Promoting wifi_password to a queryable column would imply we'd index/query on it (we won't), and production would extract secrets to a dedicated store anyway.
+- **`(channel, identifier_value) UNIQUE` on guest_identifiers.** The single most important constraint in the schema -- it's the lookup key the webhook uses to resolve a channel-specific handle to a guest_id. Cross-channel collisions are intentional (a phone on WhatsApp + a different phone on Booking.com both pointing at the same guest is the WHOLE POINT of the design).
+- **`messages.direction` enum (inbound/outbound) + single `body` column.** One messages table for both directions per PLAN S10.3. Edits flow through `message_audit_log` with `before_text`/`after_text` rather than carrying duplicate `ai_body`/`agent_body` columns on every message row.
+- **Foreign-key delete behavior is mode-specific:** CASCADE for handles and audit-log (children can't outlive parent), RESTRICT for guests<-reservations and properties<-reservations (a guest with bookings cannot be hard-deleted; soft-delete via `deleted_at` instead), SET NULL for cancelled reservation -> conversation and departing agent -> conversation/message (don't orphan the audit trail).
+- **Seven indexes including three partials.** `(conversation_id, timestamp DESC)` composite covers both 'all messages in this thread' and 'last N in this thread' from one index. Partial on `conversations.reservation_id WHERE NOT NULL` keeps the index small (most pre-sales conversations have no booking). Partial on `messages WHERE send_status = 'pending'` keeps the outbox-poll index hot. Partial on `guests WHERE deleted_at IS NULL` for active-guest queries.
+- **`messages.sender_kind` is TEXT, not enum.** Three current values (guest/ai/agent) but room for future kinds (system, bot) without an `ALTER TYPE`. No PLAN constraint either way; chose forward-flex.
+- **`ai_confidence_score NUMERIC(4, 3)` with CHECK in [0, 1].** Three decimal places matches the precision used in tests. `CHECK` enforces the bounds at the DB layer in addition to Pydantic at the API boundary.
+- **Re-runnable preamble.** DROP block at the top so the reviewer can re-execute on the same DB. Tiny extra code; meaningful UX win.
+**Deviations from plan:**
+- None on the locked spec. All eight PLAN S10.1 tables present; required PLAN S10.2 fields (`source_channel`, AI-tracking columns, audit log) all wired; PLAN S10.3 inline-comment requirements met (every table carries a comment explaining one non-obvious choice).
+**Issues encountered:**
+- **Lint script bugs (not schema bugs).** Initial Python lint check had two false positives: (1) word-counter regex broke on the divider line directly under the 'Hardest design decision' header, returning 0 words instead of 158; (2) the 'naive TIMESTAMP type' detector flagged `timestamp DESC` inside `CREATE INDEX (conversation_id, timestamp DESC)` as if `timestamp` were the SQL TIMESTAMP type rather than a column reference. Fixed both: header-skip + closing-divider state machine for the word count, and a case-sensitive `TIMESTAMP` (uppercase) match for the type detector. Schema itself was clean from the first draft; this was tooling.
+**Verification (executed locally):**
+- **Lint:** custom Python check using `sqlparse` -- 35 statements, all parsed; 8 `CREATE TABLE`, 5 `CREATE TYPE` (matches PLAN S10.1); zero `VARCHAR(N)` (PLAN anti-pattern); zero naive `TIMESTAMP` types (all `TIMESTAMPTZ`).
+- **Word count:** Hardest Design Decision block = 158 words (`<= 200`).
+- **Test suite:** `pytest tests/` -> 38 passed, 1 skipped in 2.85s (no regressions).
+- **Visual review:** every table has at least one inline comment explaining a non-obvious choice; foreign-key delete behaviors are commented per relationship; the `(channel, identifier_value)` UNIQUE on `guest_identifiers` is documented as the lookup key the webhook uses.
+- A live `psql -f schema.sql` was NOT executed (no PostgreSQL on this dev machine; PLAN S15 C6 explicitly accepts visual review fallback). The reviewer running `psql -f schema.sql` against a fresh PG 13+ DB at clone time will exercise the live syntax check.
+- `sqlparse` is a one-time dev dependency installed locally; it is not added to `requirements.txt` because it is not a runtime dep.
+**Commit:** `feat: add PostgreSQL schema for unified messaging platform with identity resolution`
