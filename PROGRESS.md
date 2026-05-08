@@ -313,28 +313,26 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
   Warning: `claude-sonnet-4-20250514` deprecation -> EOL 2026-06-15 (also flagged in C5 PROGRESS, README §10 future work).
 - **Git history sanity:** `git log --oneline` -> 10 commits in clean conventional-commits chain (chore->feat->feat->feat->feat->feat->test->feat->docs->docs); zero `wip`, zero `fix typo`, zero merge commits. No squashing needed.
 
-**Submission email** (drafted; the user sends from their mail client to `Contact.us@nistula.life`):
+**Submission email** (final; sent from the user's mail client to `ash.verma@nistula.life`):
 
 ```
-To:      Contact.us@nistula.life
+To:      ash.verma@nistula.life
 Subject: Nistula Technical Assessment Submission -- Chinmoy Paul
 
-Hi Nistula team,
+Hi Ash,
 
-Submitting the technical assessment.
+Submitting my completed assessment.
 
-Repo:    https://github.com/chinmoypaul8897/nistula_message_handler
+Repository: https://github.com/chinmoypaul8897/nistula_message_handler
 
-Contents:
-- Part 1 (webhook + Claude integration + confidence scoring) under src/, with mocked + live tests under tests/.
-- Part 2 (PostgreSQL unified-messaging schema) in schema.sql -- the "hardest design decision" paragraph on identity resolution is at the top of the file.
-- Part 3 (3am hot-water scenario response, 399 words) in thinking.md.
+The README covers architecture, decisions, and setup.
 
-The README at the repo root walks the architecture, the locked decisions, the confidence-scoring math (with two worked examples), and the security considerations. PLAN.md and PROGRESS.md document the engineering process chunk-by-chunk for anyone who wants to see how the project was built.
+I've also included PLAN.md and PROGRESS.md in the repo -- the execution plan I wrote before any code, and a chunk-by-chunk log of how the build actually went.
 
-Thanks for the opportunity. Looking forward to your feedback.
+Your email noted that decisions matter equally with code, so I'm sharing the thinking trail alongside the implementation.
 
--- Chinmoy
+Best,
+Chinmoy Paul
 ```
 
 **Final commit:** `docs: finalize README, test on clean clone, complete PROGRESS.md`
