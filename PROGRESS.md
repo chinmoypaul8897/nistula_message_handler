@@ -8,7 +8,7 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 |-------|----------------|-----------------------|--------------------------------------------------------|
 | C0    | Done           | 2026-05-08 14:42 UTC  | Repo seeded, venv verified, FastAPI healthz live       |
 | C1    | Done           | 2026-05-08 14:53 UTC  | Pydantic models + Villa B1 context, 8/8 tests passing  |
-| C2    | Not started    | -                     | -                                                      |
+| C2    | Done           | 2026-05-08 15:34 UTC  | Claude tool-use wired, 13/13 tests + live call green   |
 | C3    | Not started    | -                     | -                                                      |
 | C4    | Not started    | -                     | -                                                      |
 | C5    | Not started    | -                     | -                                                      |
@@ -63,3 +63,41 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 - `python -c "from src.models import InboundWebhook, UnifiedMessage, ClaudeReplyOutput, EndpointResponse, QueryType, ActionType"` -> imports OK.
 - `python -c "from src.property_context import format_for_prompt; print(format_for_prompt())"` -> 15-line block printed; wifi password `Nistula@2024`, base rate `INR 18000`, and check-in `14:00` all visible.
 **Commit:** `feat: add Pydantic models for unified schema and Villa B1 property context`
+
+### C2 - Claude Client & Tool-Use Call
+**Completed:** 2026-05-08 15:34 UTC
+**Files created:** src/prompts.py, src/claude_client.py, tests/test_claude_client.py
+**What was built:** A working Anthropic SDK wrapper that calls Claude with forced tool-use and returns a validated `ClaudeReplyOutput`. `src/prompts.py` holds the locked TOOL_DEFINITION (PLAN S7.2), SYSTEM_PROMPT_TEMPLATE (PLAN S7.3), `build_system_prompt(property_context)` rendering the template with the formatted Villa B1 block, and `format_user_message(unified)` wrapping the inbound payload in XML-like tags so guest message text cannot be confused with structural instructions. `src/claude_client.py` defines three typed exceptions (`ClaudeTimeoutError`, `ClaudeRateLimitError`, `ClaudeServiceError`), constants (`MODEL = "claude-sonnet-4-20250514"`, `MAX_TOKENS = 1024`), a lazy `_get_client()` singleton, and `draft_reply(unified)` which forces `tool_choice` and validates `response.content[0].input` against `ClaudeReplyOutput`.
+**Decisions made or changed:**
+- **Live integration test executed.** Per PLAN S15 C2 verification, ran one real API call against the brief's example payload and confirmed a sensible `ClaudeReplyOutput` returned. Sanitized output below. ANTHROPIC_API_KEY was loaded from a gitignored `.env` and never logged.
+- **No XML escaping in `format_user_message`.** The system-prompt rule (PLAN S3.5) is the locked primary defense against prompt injection and test case 5 in PLAN S9 exercises it. A short module docstring notes the residual tag-spoofing risk so future readers see the trade-off.
+- **5 mocked tests** (PLAN required 2): happy_path_calls_with_correct_args, malformed_tool_input -> ClaudeServiceError, APITimeoutError -> ClaudeTimeoutError, RateLimitError -> ClaudeRateLimitError, non_tool_use_content -> ClaudeServiceError. The error-mapping tests pin the contract C4 will rely on.
+- **Lazy `_get_client()` singleton.** Module-level `_client = None`, instantiated on first call. Clean test mocking (each test patches `_get_client`), no eager-fail-at-import when `.env` is missing, single SDK instance per process for connection reuse.
+- **Defensive guard on response shape.** Even with `tool_choice` forcing, `draft_reply` checks `block.type == "tool_use"` and `block.name == "draft_guest_reply"` before reading `.input`. Anything else raises `ClaudeServiceError`. PLAN S7.5 calls this out as defense-in-depth and a mocked test exercises it.
+- **Logging discipline.** INFO logs the call_id, source, message length, query_type, and context_sufficient. DEBUG logs the rendered system prompt and user message. The API key is never read into a log record. The full message text is never logged at INFO (PII per PLAN anti-patterns).
+**Deviations from plan:** None.
+**Issues encountered:**
+- The first live-test print failed with `UnicodeEncodeError` on `₹` (the `INR` rupee symbol) because Windows default stdout is cp1252. The Claude call itself fully succeeded -- the crash was purely a print-time encoding artifact. Re-ran with `sys.stdout.reconfigure(encoding="utf-8")` and captured the full output. Worth noting because the eventual /webhook/message JSON response will need `ensure_ascii=False` only if we round-trip through json.dumps; FastAPI handles this correctly by default. No code change needed for C2.
+**Verification (executed locally):**
+- `pytest tests/ -v` -> 13 passed in 2.81s (5 new + 8 from C1).
+- `python -c "from src.claude_client import draft_reply, ClaudeServiceError, ClaudeTimeoutError, ClaudeRateLimitError, MODEL, MAX_TOKENS; from src.prompts import TOOL_DEFINITION, build_system_prompt, format_user_message"` -> imports OK; MODEL=claude-sonnet-4-20250514, MAX_TOKENS=1024, tool name=draft_guest_reply.
+- `git check-ignore .env` -> .env confirmed gitignored before any live call.
+- **Live API call** (sanitized; brief example payload from PLAN S9 case 1):
+  ```
+  POST https://api.anthropic.com/v1/messages -> 200 OK
+  query_type: pre_sales_availability
+  classification_confidence: 0.95
+  context_sufficient: True
+  missing_information: []
+  reasoning: Guest is asking about availability and pricing for specific dates
+            and guest count. Property context contains availability for April
+            20, 2024, and pricing structure for base occupancy.
+  drafted_reply (304 chars):
+    Hi Rahul! Yes, Villa B1 is available from April 20-24. For 2 adults,
+    the rate is INR 18,000 per night (includes up to 4 guests). The villa
+    features 3 bedrooms, private pool, and can accommodate up to 6 guests
+    total. Check-in is at 2 PM and check-out at 11 AM. Would you like me
+    to help you with the booking?
+  ```
+  Reply uses only facts from the locked property context, addresses the guest by name, sits within the 30-600 character bound, no placeholders, no hedge tokens.
+**Commit:** `feat: integrate Claude tool-use for structured guest reply drafting`
