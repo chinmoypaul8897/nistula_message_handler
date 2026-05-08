@@ -9,7 +9,7 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 | C0    | Done           | 2026-05-08 14:42 UTC  | Repo seeded, venv verified, FastAPI healthz live       |
 | C1    | Done           | 2026-05-08 14:53 UTC  | Pydantic models + Villa B1 context, 8/8 tests passing  |
 | C2    | Done           | 2026-05-08 15:34 UTC  | Claude tool-use wired, 13/13 tests + live call green   |
-| C3    | Not started    | -                     | -                                                      |
+| C3    | Done           | 2026-05-08 15:49 UTC  | Confidence scoring + overrides, 33/33 tests passing    |
 | C4    | Not started    | -                     | -                                                      |
 | C5    | Not started    | -                     | -                                                      |
 | C6    | Not started    | -                     | -                                                      |
@@ -101,3 +101,24 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
   ```
   Reply uses only facts from the locked property context, addresses the guest by name, sits within the 30-600 character bound, no placeholders, no hedge tokens.
 **Commit:** `feat: integrate Claude tool-use for structured guest reply drafting`
+
+### C3 - Confidence Scoring Module
+**Completed:** 2026-05-08 15:49 UTC
+**Files created:** src/confidence.py, tests/test_confidence.py
+**What was built:** A pure deterministic scoring module. Constants (`RISK_CLASS_SCORES`, `WEIGHTS`, `HEDGE_TOKENS`, `_PLACEHOLDER_RE`, `_IST`) plus six functions: `is_after_hours(ts)` (IST-converted), `reply_completeness(reply)` (PLAN S6.4 heuristic), `compute_base_score(claude_output)` (4-factor weighted sum from PLAN S6.2), `apply_overrides(base, claude_output, message)` (three PLAN S6.3 overrides in order, falls through to threshold mapping), `_action_from_threshold(score)` (PLAN S6.6 with strict >0.85), and `score_and_act(claude_output, message)` (the orchestrator C4 will call). No `claude_client` import (anti-pattern); module is a pure function of inputs.
+**Decisions made or changed:**
+- **Override #2 score caps at 0.59.** PLAN S6.3 #2 specifies the action (escalate) but not the score. Capped via `min(base_score, 0.59)` so the returned (score, action) pair is internally consistent with the PLAN S6.6 threshold table -- score < 0.60 always implies escalate, no auditor confusion. Override fully recoverable from inputs since base_score is computed first.
+- **`apply_overrides` does both overrides AND threshold mapping.** Matches PLAN's typed signature `(float, ActionType)` exactly (not Optional). `score_and_act` is a thin three-line wrapper. Single function owns the action decision; per-override tests still target the override paths individually.
+- **Hedge-token matching is substring case-insensitive.** Exactly PLAN S6.4 wording ("contains hedge tokens"). Fast and predictable. Tiny risk of false positives (e.g. "I think tank") accepted because the heuristic is for catching genuine hedging, not adversarial edge cases.
+- **Multiple hedges/placeholders subtract once total.** PLAN S6.4 wording is "if reply contains hedge tokens" (singular -0.3), not "for each token". Reply with two hedges still subtracts only 0.3.
+- **15 focused tests** (PLAN listed 9): 2 constants integrity (WEIGHTS sums to 1, RISK_CLASS_SCORES covers all six QueryType values), 5 base/threshold (worked example from PLAN S6.7, general_enquiry perfect signals, threshold above/at/below 0.85 and 0.60), 4 override (each of #1/#2/#3 plus the ordering test for complaint at 3am where #1 must beat #2), 4 after-hours boundaries (22:00, 21:59, 08:00, 07:59 IST), 5 reply_completeness (perfect, hedge, placeholder, short, maximally bad).
+- **Floating-point assertions use `pytest.approx`** per PLAN's anti-pattern; threshold tests pick values away from edges (0.851, 0.599) to avoid drift.
+**Deviations from plan:**
+- **Switched IST tz from `zoneinfo.ZoneInfo("Asia/Kolkata")` to a fixed `timezone(timedelta(hours=5, minutes=30))`.** Discovered Windows Python's stdlib `zoneinfo` requires the `tzdata` package as an indirect runtime dependency on systems without a tz database (test collection failed with `ZoneInfoNotFoundError`). Two clean fixes: add `tzdata` to requirements.txt or use a fixed offset. Chose the fixed offset because India does not observe DST, the constant is simpler, and it keeps the dependency list shorter. Behaviorally equivalent for IST.
+**Issues encountered:**
+- First `pytest tests/` run failed at collection with `ZoneInfoNotFoundError: 'No time zone found with key Asia/Kolkata'`. Resolved by switching to a fixed-offset timezone (see deviation above). All 33 tests then passed.
+**Verification (executed locally):**
+- `pytest tests/ -v` -> 33 passed in 1.41s (5 from C2 + 18 new C3 + 8 from C1 + 2 constants integrity).
+- `python -c "from src.confidence import score_and_act, is_after_hours, reply_completeness, RISK_CLASS_SCORES, WEIGHTS, HEDGE_TOKENS"` -> imports clean. `WEIGHTS` sums to 1.0; `RISK_CLASS_SCORES` covers all six `QueryType` values.
+- Sanity round-trip: PLAN S6.7 worked example (`pre_sales_pricing`, classification=0.95, context_sufficient=True, sane reply) -> `score_and_act` returned `(0.945, 'auto_send')` exactly as PLAN predicts.
+**Commit:** `feat: add multi-factor confidence scoring with hard overrides`
