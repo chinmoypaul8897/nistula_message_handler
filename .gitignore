@@ -1,0 +1,19 @@
+# Secrets — never commit real env files. Only .env.example is tracked (added in Chunk 0).
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Virtualenvs
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
