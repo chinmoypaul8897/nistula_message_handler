@@ -13,7 +13,7 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 | C4    | Done           | 2026-05-08 16:00 UTC  | /webhook/message wired end-to-end, 200/422 verified live|
 | C5    | Done           | 2026-05-08 16:41 UTC  | 5 canonical scenarios + live test, 38/38 + 1 live green|
 | C6    | Done           | 2026-05-08 16:58 UTC  | schema.sql -- 8 tables + 5 enums + indexes, 158-word HDD|
-| C7    | Not started    | -                     | -                                                      |
+| C7    | Done           | 2026-05-08 17:18 UTC  | thinking.md -- 399/400 words, all required content present|
 | C8    | Not started    | -                     | -                                                      |
 | C9    | Not started    | -                     | -                                                      |
 
@@ -207,3 +207,29 @@ Chunk-by-chunk execution log for the Nistula Message Handler. The build plan is 
 - A live `psql -f schema.sql` was NOT executed (no PostgreSQL on this dev machine; PLAN S15 C6 explicitly accepts visual review fallback). The reviewer running `psql -f schema.sql` against a fresh PG 13+ DB at clone time will exercise the live syntax check.
 - `sqlparse` is a one-time dev dependency installed locally; it is not added to `requirements.txt` because it is not a runtime dep.
 **Commit:** `feat: add PostgreSQL schema for unified messaging platform with identity resolution`
+
+### C7 - thinking.md (Part 3)
+**Completed:** 2026-05-08 17:18 UTC
+**Files created:** thinking.md
+**What was built:** Three-section response to the 3am hot-water scenario per PLAN S11. Question A (the immediate reply) is a four-sentence, first-person warm message addressed to James, in a markdown blockquote, followed by a 35-word "why" paragraph framing the trade-off (feeling-heard-in-seconds vs. not making commitments the on-call human hasn't approved). Question B is a compressed t=0 / t=+15 / t=+30 / "throughout" timeline covering all eight PLAN-required elements (AI ack at t=0, confidence override -> escalate, pager cascade WhatsApp->SMS->email, incident row with severity/property/guest/conversation/category, caretaker page, +15 escalate to property manager, +30 escalate to founder + delay-acknowledgement to guest, message_audit_log throughout). Question C uses bullets with all four PLAN-prescribed artifacts named verbatim: preventive maintenance schedule (geyser inspection within 48h on pattern detection), pre-arrival auto-check (caretaker confirms hot water 4h before each Villa B1 check-in, logged in PMS), issue heatmap (`complaints x property x issue_type` with threshold alerts at 2/30 days), and root-cause field on every resolved complaint (human writes the root cause within 7 days of close).
+**Decisions made or changed:**
+- **First-person warm reply tone.** PLAN S11 explicitly rules out corporate hedging; the reply uses contractions ("I'm", "they'll"), addresses James directly, and avoids hospitality-template language. No fix-by-breakfast promise, no refund offered, no specific arrival time committed.
+- **Compressed t-bucket timeline format for Question B.** Three time buckets (t=0, t=+15, t=+30) plus a "Throughout" footer covering message_audit_log persistence. Saves ~30 words vs. enumerating eight numbered events line-by-line, freeing budget for Question C per PLAN's "differentiator" emphasis.
+- **Bullet structure for Question C with all four artifacts named verbatim.** Mirrors PLAN S11's prescribed structure: Observation -> System action right now -> Build to prevent the 4th (with four sub-bullets). Bullets force concrete naming, exactly the discipline PLAN's anti-pattern ('do not write Question C as platitudes') guards against.
+- **The reply is set in a markdown blockquote** so the reviewer can scan the literal text Claude would send without separating it from the meta-commentary.
+- **Word budget allocation.** A ~80, B ~165, C ~155, total 399. C is the differentiator per PLAN; the budget lands on the artifacts list rather than padding the timeline.
+**Deviations from plan:** None.
+**Issues encountered:**
+- None. First draft hit 399 words; one-word-under-cap allowed without trimming.
+**Verification (executed locally):**
+- `wc -w thinking.md` -> **399** (PLAN cap is 400). Python `len(text.split())` confirmed 399 (no whitespace-counting discrepancy between the two tools).
+- All required content present (verified by an automated check):
+  - All three sub-questions have explicit `## Question A/B/C` headers.
+  - Reply names "James" and "Villa B1" verbatim.
+  - Question B contains `t=0`, `t=+15`, `t=+30`, and references `message_audit_log` for the post-incident review path.
+  - Question C names all four PLAN S11 artifacts: preventive maintenance, pre-arrival auto-check, issue heatmap, root-cause field.
+- Reading time on a quick re-read: well under three minutes.
+- `pytest tests/` -> 38 passed, 1 skipped in 1.41s (no regression on Part 1 from the new doc).
+**Reply text (the answer to Question A, quoted in full for the audit trail):**
+> James -- I'm so sorry. I've just woken our on-call team for Villa B1; they'll be in touch with you within minutes. We know breakfast is coming and we'll do everything we can. Truly sorry for the disruption.
+**Commit:** `docs: add thinking.md responses for 3am hot water scenario`
