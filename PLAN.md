@@ -123,7 +123,7 @@ pytest-asyncio>=0.23
 ## 5. File Structure
 
 ```
-nistula-technical-assessment/
+nistula_message_handler/
 ├── README.md                     # Architecture + decisions + setup (HIGH-LEVERAGE)
 ├── PLAN.md                       # This file
 ├── PROGRESS.md                   # Chunk-by-chunk execution log
@@ -637,7 +637,7 @@ After each chunk completes, append the chunk's log entry and update the status s
 
 ### 14.1 Repo
 
-- Public repo named `nistula-technical-assessment`.
+- Public repo named `nistula_message_handler`.
 - Initial commit at C0. Push frequently — at minimum after each chunk.
 - Do NOT include `.env`. Do NOT include the API key anywhere in any commit (history matters; if accidentally committed, the key must be rotated by Nistula and we cannot do that).
 
@@ -704,7 +704,7 @@ Ten chunks. Each is self-contained.
 4. Write `.env.example` with `ANTHROPIC_API_KEY=` and a comment explaining where to obtain it.
 5. Write minimal `src/main.py`: FastAPI app, GET `/healthz` returning `{"status": "ok"}`. The webhook endpoint goes in C4; do NOT stub it now — leaving `/webhook/message` undefined keeps the early commits honest.
 6. Write README skeleton: title, one-paragraph project summary, "Setup" section with placeholder, "Status: in progress" note. Full README is C8.
-7. Initialize git, create GitHub repo `nistula-technical-assessment`, push initial commit.
+7. Initialize git, create GitHub repo `nistula_message_handler`, push initial commit.
 8. Verify `uvicorn src.main:app --reload` boots and `/healthz` returns 200.
 9. Verify `/docs` opens and shows the healthz endpoint.
 10. Update PROGRESS.md with C0 entry.
@@ -714,7 +714,7 @@ Ten chunks. Each is self-contained.
 - `uvicorn src.main:app --reload` boots without errors.
 - `curl localhost:8000/healthz` returns `{"status": "ok"}` with HTTP 200.
 - `localhost:8000/docs` renders the OpenAPI page.
-- Repo visible at `https://github.com/<user>/nistula-technical-assessment`.
+- Repo visible at `https://github.com/<user>/nistula_message_handler`.
 - `.env` is not in the repo.
 
 **Commit message:**
@@ -1094,7 +1094,7 @@ Ten chunks. Each is self-contained.
    ```
    cd /tmp
    git clone <repo>
-   cd nistula-technical-assessment
+   cd nistula_message_handler
    python -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
    cp .env.example .env  # fill in key
@@ -1158,7 +1158,7 @@ flowchart LR
    ```
    cd /tmp/test
    git clone <repo>
-   cd nistula-technical-assessment
+   cd nistula_message_handler
    python -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
    cp .env.example .env  # add key
@@ -1206,7 +1206,7 @@ flowchart LR
 
 Before sending the submission email:
 
-- [ ] Repo is public at `https://github.com/<user>/nistula-technical-assessment`.
+- [ ] Repo is public at `https://github.com/<user>/nistula_message_handler`.
 - [ ] `README.md` complete and tested on clean clone.
 - [ ] `PLAN.md` in repo.
 - [ ] `PROGRESS.md` complete.
